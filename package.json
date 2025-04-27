@@ -1,0 +1,22 @@
+{
+  "name": "othello-game-ts",
+  "version": "1.0.0",
+  "description": "TypeScriptで実装したオセロゲーム",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc && cp public/index.html dist/ && cp public/styles.css dist/",
+    "start": "npm run build && http-server dist",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "othello",
+    "game",
+    "typescript"
+  ],
+  "author": "shunsukehata",
+  "license": "MIT",
+  "devDependencies": {
+    "http-server": "^14.1.1",
+    "typescript": "^5.0.0"
+  }
+}
