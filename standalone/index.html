@@ -1,0 +1,608 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>オセロゲーム</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⚫</text></svg>">
+  <style>
+    /* 全体のスタイル */
+    body {
+      font-family: 'Helvetica Neue', Arial, sans-serif;
+      background-color: #f0f0f0;
+      color: #333;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .container {
+      max-width: 600px;
+      margin: 0 auto;
+    }
+
+    h1 {
+      text-align: center;
+      color: #333;
+      margin-bottom: 20px;
+    }
+
+    /* ゲーム情報のスタイル */
+    .game-info {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 20px;
+      background-color: #fff;
+      padding: 10px 20px;
+      border-radius: 5px;
+      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    }
+
+    .game-status {
+      font-weight: bold;
+      font-size: 1.2em;
+    }
+
+    .game-score {
+      font-size: 1.2em;
+    }
+
+    /* オセロボードのスタイル */
+    .othello-board {
+      display: grid;
+      grid-template-columns: repeat(8, 1fr);
+      gap: 2px;
+      width: 100%;
+      max-width: 500px;
+      margin: 0 auto 30px;
+      background-color: #388E3C;
+      padding: 10px;
+      border-radius: 5px;
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+    }
+
+    .othello-cell {
+      position: relative;
+      width: 100%;
+      background-color: #4CAF50;
+      border-radius: 3px;
+      cursor: pointer;
+      transition: background-color 0.2s;
+    }
+
+    /* セルを正方形にする */
+    .othello-cell::before {
+      content: '';
+      display: block;
+      padding-bottom: 100%;
+    }
+
+    .othello-cell.valid-move {
+      background-color: #81C784;
+    }
+
+    .othello-cell:hover {
+      background-color: #66BB6A;
+    }
+
+    .stone {
+      position: absolute;
+      top: 10%;
+      left: 10%;
+      width: 80%;
+      height: 80%;
+      border-radius: 50%;
+      transition: all 0.3s ease;
+    }
+
+    .stone.black {
+      background-color: #000;
+      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.5);
+    }
+
+    .stone.white {
+      background-color: #fff;
+      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.5);
+    }
+
+    /* コントロール部分のスタイル */
+    .controls {
+      text-align: center;
+      margin-bottom: 30px;
+    }
+
+    .reset-button {
+      background-color: #2196F3;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      font-size: 1em;
+      border-radius: 5px;
+      cursor: pointer;
+      transition: background-color 0.2s;
+    }
+
+    .reset-button:hover {
+      background-color: #0b7dda;
+    }
+
+    /* ルール説明のスタイル */
+    .instructions {
+      background-color: #fff;
+      padding: 20px;
+      border-radius: 5px;
+      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    }
+
+    .instructions h2 {
+      margin-top: 0;
+      color: #333;
+    }
+
+    .instructions ul {
+      padding-left: 20px;
+    }
+
+    .instructions li {
+      margin-bottom: 8px;
+    }
+
+    /* レスポンシブ対応 */
+    @media (max-width: 500px) {
+      .game-info {
+        flex-direction: column;
+        align-items: center;
+      }
+      
+      .game-status, .game-score {
+        margin-bottom: 10px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>オセロゲーム</h1>
+    
+    <div class="game-info">
+      <div id="game-status" class="game-status">黒の番です</div>
+      <div id="game-score" class="game-score">黒: 2  白: 2</div>
+    </div>
+    
+    <div id="game-board" class="game-board">
+      <!-- JavaScriptで動的に盤面が生成される -->
+    </div>
+    
+    <div class="controls">
+      <button id="reset-button" class="reset-button">ゲームをリセット</button>
+    </div>
+    
+    <div class="instructions">
+      <h2>ルール</h2>
+      <ul>
+        <li>黒から始まり、交互に石を置いていきます</li>
+        <li>相手の石を自分の石で挟むと、挟んだ石は自分の色に変わります</li>
+        <li>少なくとも1つの石を裏返せる場所にのみ石を置けます</li>
+        <li>石を置く場所がない場合はパスとなります</li>
+        <li>両者とも置く場所がなくなるか、盤面が埋まるとゲーム終了です</li>
+        <li>より多くの石を自分の色にした方が勝ちです</li>
+      </ul>
+    </div>
+  </div>
+  
+  <script>
+    /**
+     * オセロゲームのモデルを表すクラス
+     * ゲーム盤面の状態やゲームロジックを管理する
+     */
+    class OthelloGame {
+      // ボードの大きさ
+      static BOARD_SIZE = 8;
+      
+      // プレイヤー定数
+      static EMPTY = 0;
+      static BLACK = 1;
+      static WHITE = 2;
+      
+      // 8方向の探索用オフセット（上、右上、右、右下、下、左下、左、左上）
+      static DIRECTIONS = [
+        { x: 0, y: -1 }, { x: 1, y: -1 }, { x: 1, y: 0 }, { x: 1, y: 1 },
+        { x: 0, y: 1 }, { x: -1, y: 1 }, { x: -1, y: 0 }, { x: -1, y: -1 }
+      ];
+
+      /**
+       * ゲームを初期化する
+       */
+      constructor() {
+        // 盤面の初期化
+        this.board = Array(OthelloGame.BOARD_SIZE).fill(null)
+          .map(() => Array(OthelloGame.BOARD_SIZE).fill(OthelloGame.EMPTY));
+        
+        // 初期配置（中央に白黒2つずつ配置）
+        const mid = OthelloGame.BOARD_SIZE / 2;
+        this.board[mid - 1][mid - 1] = OthelloGame.WHITE;
+        this.board[mid][mid] = OthelloGame.WHITE;
+        this.board[mid - 1][mid] = OthelloGame.BLACK;
+        this.board[mid][mid - 1] = OthelloGame.BLACK;
+        
+        // 黒から開始
+        this.currentPlayer = OthelloGame.BLACK;
+        
+        // 最初に4つの石が置かれている
+        this.stonePlaced = 4;
+      }
+
+      /**
+       * 現在の盤面を取得する
+       * @returns 盤面配列のコピー
+       */
+      getBoard() {
+        return this.board.map(row => [...row]);
+      }
+
+      /**
+       * 現在のプレイヤーを取得する
+       * @returns 現在のプレイヤー（BLACK or WHITE）
+       */
+      getCurrentPlayer() {
+        return this.currentPlayer;
+      }
+
+      /**
+       * ゲームが終了したかどうかを判定する
+       * @returns ゲームが終了した場合はtrue、続行中の場合はfalse
+       */
+      isGameOver() {
+        // 盤面が全て埋まった場合
+        if (this.stonePlaced >= OthelloGame.BOARD_SIZE * OthelloGame.BOARD_SIZE) {
+          return true;
+        }
+        
+        // どちらのプレイヤーも石を置けない場合
+        return !this.hasValidMove(OthelloGame.BLACK) && 
+              !this.hasValidMove(OthelloGame.WHITE);
+      }
+
+      /**
+       * 指定したプレイヤーが有効な手を持っているかチェックする
+       * @param player 判定するプレイヤー
+       * @returns 有効な手がある場合はtrue、ない場合はfalse
+       */
+      hasValidMove(player) {
+        for (let y = 0; y < OthelloGame.BOARD_SIZE; y++) {
+          for (let x = 0; x < OthelloGame.BOARD_SIZE; x++) {
+            if (this.isValidMove(x, y, player)) {
+              return true;
+            }
+          }
+        }
+        return false;
+      }
+
+      /**
+       * 指定した場所に石を置くことが有効な手かどうかを判定する
+       * @param x X座標
+       * @param y Y座標
+       * @param player プレイヤー
+       * @returns 有効な場合はtrue、無効な場合はfalse
+       */
+      isValidMove(x, y, player) {
+        // すでに石が置かれている場合は無効
+        if (this.board[y][x] !== OthelloGame.EMPTY) {
+          return false;
+        }
+        
+        // 8方向のそれぞれで、挟むことができる石があるかチェック
+        for (const dir of OthelloGame.DIRECTIONS) {
+          let nx = x + dir.x;
+          let ny = y + dir.y;
+          let foundOpponent = false;
+          
+          // ボード内にあり、かつ相手の石があれば進む
+          while (
+            nx >= 0 && nx < OthelloGame.BOARD_SIZE && 
+            ny >= 0 && ny < OthelloGame.BOARD_SIZE &&
+            this.board[ny][nx] !== OthelloGame.EMPTY && 
+            this.board[ny][nx] !== player
+          ) {
+            foundOpponent = true;
+            nx += dir.x;
+            ny += dir.y;
+          }
+          
+          // 最後に自分の石があれば、相手の石を挟むことができる
+          if (
+            foundOpponent && 
+            nx >= 0 && nx < OthelloGame.BOARD_SIZE && 
+            ny >= 0 && ny < OthelloGame.BOARD_SIZE && 
+            this.board[ny][nx] === player
+          ) {
+            return true;
+          }
+        }
+        
+        return false;
+      }
+
+      /**
+       * 石を置いて盤面を更新する
+       * @param x X座標
+       * @param y Y座標
+       * @returns 手が有効で置けた場合はtrue、無効で置けなかった場合はfalse
+       */
+      placeStone(x, y) {
+        // 現在のプレイヤーが石を置けるかチェック
+        if (!this.isValidMove(x, y, this.currentPlayer)) {
+          return false;
+        }
+        
+        // 石を置く
+        this.board[y][x] = this.currentPlayer;
+        this.stonePlaced++;
+        
+        // 8方向を探索して、挟んだ石を裏返す
+        for (const dir of OthelloGame.DIRECTIONS) {
+          this.flipDirection(x, y, dir.x, dir.y);
+        }
+        
+        // 次のプレイヤーに交代
+        this.nextPlayer();
+        
+        // 次のプレイヤーに有効手がない場合はパスして再度交代
+        if (!this.hasValidMove(this.currentPlayer)) {
+          this.nextPlayer();
+        }
+        
+        return true;
+      }
+
+      /**
+       * 指定方向に挟まれた石を裏返す
+       * @param x 石を置いたX座標
+       * @param y 石を置いたY座標
+       * @param dx 探索するX方向
+       * @param dy 探索するY方向
+       */
+      flipDirection(x, y, dx, dy) {
+        const player = this.currentPlayer;
+        const flips = [];
+        let nx = x + dx;
+        let ny = y + dy;
+        
+        // 相手の石を探索
+        while (
+          nx >= 0 && nx < OthelloGame.BOARD_SIZE && 
+          ny >= 0 && ny < OthelloGame.BOARD_SIZE &&
+          this.board[ny][nx] !== OthelloGame.EMPTY && 
+          this.board[ny][nx] !== player
+        ) {
+          flips.push({ x: nx, y: ny });
+          nx += dx;
+          ny += dy;
+        }
+        
+        // 最後に自分の石があれば、間の石を裏返す
+        if (
+          nx >= 0 && nx < OthelloGame.BOARD_SIZE && 
+          ny >= 0 && ny < OthelloGame.BOARD_SIZE && 
+          this.board[ny][nx] === player
+        ) {
+          for (const pos of flips) {
+            this.board[pos.y][pos.x] = player;
+          }
+        }
+      }
+      
+      /**
+       * 次のプレイヤーに交代する
+       */
+      nextPlayer() {
+        this.currentPlayer = 
+          this.currentPlayer === OthelloGame.BLACK ? 
+          OthelloGame.WHITE : 
+          OthelloGame.BLACK;
+      }
+      
+      /**
+       * 各プレイヤーの石の数を取得する
+       * @returns プレイヤーごとの石の数を含むオブジェクト
+       */
+      getScore() {
+        let black = 0;
+        let white = 0;
+        
+        for (let y = 0; y < OthelloGame.BOARD_SIZE; y++) {
+          for (let x = 0; x < OthelloGame.BOARD_SIZE; x++) {
+            if (this.board[y][x] === OthelloGame.BLACK) {
+              black++;
+            } else if (this.board[y][x] === OthelloGame.WHITE) {
+              white++;
+            }
+          }
+        }
+        
+        return { black, white };
+      }
+      
+      /**
+       * 勝者を判定する
+       * @returns 黒が勝った場合はBLACK、白が勝った場合はWHITE、引き分けの場合はEMPTY
+       */
+      getWinner() {
+        if (!this.isGameOver()) {
+          return OthelloGame.EMPTY; // ゲームが終了していない場合
+        }
+        
+        const { black, white } = this.getScore();
+        
+        if (black > white) {
+          return OthelloGame.BLACK;
+        } else if (white > black) {
+          return OthelloGame.WHITE;
+        } else {
+          return OthelloGame.EMPTY; // 引き分け
+        }
+      }
+    }
+
+    /**
+     * オセロゲームのUIを管理するクラス
+     * HTMLとの連携、イベント処理を担当する
+     */
+    class OthelloUI {
+      /**
+       * UIを初期化する
+       * @param boardId ボードを表示する要素のID
+       * @param statusId ステータスを表示する要素のID
+       * @param scoreId スコアを表示する要素のID
+       * @param resetButtonId リセットボタンの要素のID
+       */
+      constructor(
+        boardId,
+        statusId,
+        scoreId,
+        resetButtonId
+      ) {
+        // ゲームのインスタンスを作成
+        this.game = new OthelloGame();
+        
+        // DOM要素を取得
+        this.boardElement = document.getElementById(boardId);
+        this.statusElement = document.getElementById(statusId);
+        this.scoreElement = document.getElementById(scoreId);
+        this.resetButton = document.getElementById(resetButtonId);
+        
+        if (!this.boardElement || !this.statusElement || 
+            !this.scoreElement || !this.resetButton) {
+          throw new Error('Required DOM elements not found');
+        }
+        
+        // リセットボタンのイベントハンドラを設定
+        this.resetButton.addEventListener('click', () => this.resetGame());
+        
+        // 初期表示
+        this.render();
+      }
+      
+      /**
+       * ゲームをリセットする
+       */
+      resetGame() {
+        this.game = new OthelloGame();
+        this.render();
+      }
+      
+      /**
+       * UIを更新する
+       */
+      render() {
+        this.renderBoard();
+        this.renderStatus();
+        this.renderScore();
+      }
+      
+      /**
+       * ボードを描画する
+       */
+      renderBoard() {
+        // ボードの初期化（子要素をすべて削除）
+        this.boardElement.innerHTML = '';
+        
+        const board = this.game.getBoard();
+        
+        // ボード要素にクラスを設定
+        this.boardElement.className = 'othello-board';
+        
+        // 各セルを作成
+        for (let y = 0; y < board.length; y++) {
+          for (let x = 0; x < board[y].length; x++) {
+            const cell = document.createElement('div');
+            cell.className = 'othello-cell';
+            
+            // セルのインデックスをデータ属性として設定
+            cell.dataset.x = x.toString();
+            cell.dataset.y = y.toString();
+            
+            // セルの石の状態に応じてクラスを追加
+            const cellContent = document.createElement('div');
+            cellContent.className = 'stone';
+            
+            if (board[y][x] === OthelloGame.BLACK) {
+              cellContent.classList.add('black');
+            } else if (board[y][x] === OthelloGame.WHITE) {
+              cellContent.classList.add('white');
+            } else if (this.game.isValidMove(x, y, this.game.getCurrentPlayer())) {
+              // 有効な手の場合はハイライト
+              cell.classList.add('valid-move');
+            }
+            
+            cell.appendChild(cellContent);
+            
+            // クリックイベントハンドラを設定
+            cell.addEventListener('click', () => this.handleCellClick(x, y));
+            
+            // ボードに追加
+            this.boardElement.appendChild(cell);
+          }
+        }
+      }
+      
+      /**
+       * ステータスを描画する
+       */
+      renderStatus() {
+        if (this.game.isGameOver()) {
+          const winner = this.game.getWinner();
+          if (winner === OthelloGame.BLACK) {
+            this.statusElement.textContent = '黒の勝ちです！';
+          } else if (winner === OthelloGame.WHITE) {
+            this.statusElement.textContent = '白の勝ちです！';
+          } else {
+            this.statusElement.textContent = '引き分けです！';
+          }
+        } else {
+          const currentPlayer = this.game.getCurrentPlayer();
+          this.statusElement.textContent = 
+            currentPlayer === OthelloGame.BLACK ? '黒の番です' : '白の番です';
+        }
+      }
+      
+      /**
+       * スコアを描画する
+       */
+      renderScore() {
+        const score = this.game.getScore();
+        this.scoreElement.textContent = `黒: ${score.black}  白: ${score.white}`;
+      }
+      
+      /**
+       * セルクリック時の処理
+       * @param x X座標
+       * @param y Y座標
+       */
+      handleCellClick(x, y) {
+        // 石を置く
+        const placed = this.game.placeStone(x, y);
+        
+        // 石が置かれたらUIを更新
+        if (placed) {
+          this.render();
+        }
+      }
+    }
+
+    // DOMが読み込まれた後にアプリケーションを初期化する
+    document.addEventListener('DOMContentLoaded', () => {
+      try {
+        // OthelloUIのインスタンスを作成し、ゲームを開始
+        const ui = new OthelloUI('game-board', 'game-status', 'game-score', 'reset-button');
+        console.log('オセロゲームが正常に初期化されました');
+      } catch (error) {
+        console.error('ゲームの初期化中にエラーが発生しました:', error);
+      }
+    });
+  </script>
+</body>
+</html>
